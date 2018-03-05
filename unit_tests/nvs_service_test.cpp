@@ -18,43 +18,62 @@
 #include "..\nsv_service\nsv_service.h"
 #include "..\lib\string.h"
 
-/// Service must start and stop correctly
-TEST(DISABLE_ServiceStartStopTest, StartStop)
+/// 
+TEST(UTF16_UTF8_Conversion, UTF8_To_UTF16)
 {
-	crossover::nsv_service service{U("https://127.0.0.1:34567")};
+	std::string good_utf8 = u8" Ich möchte einen kaltes Bier a á é e í i ó U ú U itsuka 日本 ni ikitainda!";
+	std::wstring good_utf16 = L" Ich möchte einen kaltes Bier a á é e í i ó U ú U itsuka 日本 ni ikitainda!";
+	std::wstring converted_utf16 = crossover::string::utf8_to_wtring(good_utf8);
+	ASSERT_EQ(good_utf16, converted_utf16);
+}
+
+TEST(UTF16_UTF8_Conversion, UTF16_To_UTF8)
+{
+
+	std::string good_utf8 = u8" Ich möchte einen kaltes Bier a á é e í i ó U ú U itsuka 日本 ni ikitainda!";
+	std::wstring good_utf16 = L" Ich möchte einen kaltes Bier a á é e í i ó U ú U itsuka 日本 ni ikitainda!";
+	std::string converted_utf8 = crossover::string::utf16_to_utf8(good_utf16);
+	ASSERT_EQ(good_utf8, converted_utf8);
+}
+
+
+/// Service must start and stop correctly
+TEST(ServiceStartStopTest, StartStop)
+{
+	std::string addr{ "http://127.0.0.1:60000" };
+	std::string mongo_uri{ "mongodb://localhost:27017/?minPoolSize=1&maxPoolSize=100" };
+	crossover::nsv::nsv_service service {addr, mongo_uri};
 	service.start().wait();
 	service.stop().wait();
 }
 
 /// Starts service and performs a Get request to it
 /// 
-/// MONGOD must be running
-TEST(DISABLE_ServiceGetTest, GetShouldSucceed) 
+/// MONGOD must be running at address localhost:27017
+TEST(ServiceGetTest, GetShouldSucceed) 
 {
 	
 	// Start service
-	utility::string_t address = U("http://127.0.0.1:34567");
-	crossover::nsv_service service(address);
-	service.start().wait();
-
-	// Create URI
-	web::uri_builder uri_builder(U(""));
+	std::string addr{ "http://127.0.0.1:60001" };
+	std::string mongo_uri{ "mongodb://localhost:27017/?minPoolSize=1&maxPoolSize=100" };
+	crossover::nsv::nsv_service service(addr, mongo_uri);
+	service.start().wait();	
 
 	// Create client
-	web::http::client::http_client client(address);
+	utility::string_t uaddr{ _XPLATSTR("http://127.0.0.1:60001") };
+	web::http::client::http_client client(uaddr);
 
 	// Setup query
-	uri_builder.append_query(U("Vehicle_Registration"), U("OI8CBS9"));
+	web::uri_builder uri_builder(_XPLATSTR(""));
+	uri_builder.append_query(_XPLATSTR("Vehicle_Registration"), _XPLATSTR("OI8CBS9"));
 
 	// Request GET
-	auto req = client.request(web::http::methods::GET, uri_builder.to_string()).then([=](web::http::http_response response)
-	{
-		auto task = response.extract_json().then([=](web::json::value v) {
+	auto req = client.request(web::http::methods::GET, uri_builder.to_string()).then(
+		[=](web::http::http_response response){
+		auto task = response.extract_json(true).then([=](web::json::value v) {
 			// Helpful when debugging
-			ucout << U("Received response:") << v.serialize() << std::endl;
+			ucout << _XPLATSTR("Matches:") << v[_XPLATSTR("matches")].as_integer() << std::endl;
 		}).wait();
-		
-
 	}).wait();
 
 	service.stop().wait();

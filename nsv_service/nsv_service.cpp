@@ -1,6 +1,19 @@
-/// bson and mongo must be included BEFORE cpprestsdk
-/// cpprestsdk defines U, which causes an issue with boost type_traits.hpp,
-/// type_traits.hpp uses U as a template typename: "... template <class U> ..."
+#define _TURN_OFF_PLATFORM_STRING 1
+
+#include "nsv_service.h"
+#include "../lib/string.h"
+
+#include <cpprest/http_client.h>
+#include <cpprest/filestream.h>
+#include <cpprest/http_listener.h>
+
+
+#include <mongocxx/client.hpp>
+#include <mongocxx/pool.hpp>
+#include <mongocxx/stdx.hpp>
+#include <mongocxx/uri.hpp>
+#include <mongocxx/instance.hpp>
+
 
 #include <bsoncxx/builder/basic/array.hpp>
 #include <bsoncxx/builder/basic/document.hpp>
@@ -8,38 +21,31 @@
 #include <bsoncxx/builder/basic/kvp.hpp>
 #include <bsoncxx/json.hpp>
 
-#include <mongocxx\client.hpp>
-#include <mongocxx\pool.hpp>
-#include <mongocxx\stdx.hpp>
-#include <mongocxx\uri.hpp>
-#include <mongocxx\instance.hpp>
-
-#include <cpprest\http_client.h>
-#include <cpprest\filestream.h>
-#include <cpprest\http_listener.h>
 
 #include <locale>
 #include <codecvt>
 #include <iostream>
 
-#include "nsv_service.h"
-
-
 namespace crossover
 {
+	namespace nsv {
+
+
 	mongocxx::instance mongodb_instance{};
 
-	// TODO: construct the pool uri somewhere else like command line args or conf file
-	mongocxx::uri mongodb_pool_uri{ "mongodb://localhost:27017/?minPoolSize=100&maxPoolSize=1" };
-
-	/// Unique mongo db pool for the entire web app
-	mongocxx::pool mongodb_pool{ mongodb_pool_uri};
-	
-
-	nsv_service::nsv_service(utility::string_t address) : m_address(address)
+	nsv_service::nsv_service(std::string service_address,
+		std::string mongo_uri
+		)
 	{
+		// Save parameters
+		m_service_address = crossover::string::to_utility_string(service_address);
+		m_mongodb_uri = mongo_uri;
+
+		// Initialize the pool
+		m_mongodb_pool = std::make_unique<mongocxx::pool>(mongocxx::uri{ m_mongodb_uri });
+
 		// Create listener
-		m_http_listener = std::make_unique<http_listener>(web::uri_builder{ m_address }.to_uri().to_string());
+		m_http_listener = std::make_unique<http_listener>(web::uri_builder{ m_service_address }.to_uri().to_string());
 
 		// Add GET support
 		m_http_listener->support(web::http::methods::GET, std::bind(&nsv_service::handle_get, this, std::placeholders::_1));
@@ -66,8 +72,11 @@ namespace crossover
 	create_query_document(std::map<utility::string_t, utility::string_t> filters)
 	{
 		bsoncxx::builder::basic::document doc{};
-		std::list<utility::string_t> filters_names
-			{U("Vehicle_Registration"), U("Vehicle_Make"), U("Vehicle_Model"), U("Vehicle_Owner")};
+		std::list<utility::string_t> filters_names{
+			_XPLATSTR("Vehicle_Registration"),
+			_XPLATSTR("Vehicle_Make"),
+			_XPLATSTR("Vehicle_Model"),
+			_XPLATSTR("Vehicle_Owner")};
 		for (auto && filter_name : filters_names)
 			if (filters.find(filter_name) != filters.end())
 			{
@@ -96,14 +105,14 @@ namespace crossover
 
 	void nsv_service::handle_get(web::http::http_request request)
 	{
-		// TODO: tear down request for a more complex scenario than
+		// TODO: factorize request for a more complex scenario than
 		//       a root URI
 
 		using bsoncxx::builder::basic::kvp;
 		using bsoncxx::builder::basic::document;
 		
 		// Debugging
-		ucout << request.to_string() << std::endl;
+		// ucout << request.to_string() << std::endl;
 
 		try
 		{
@@ -112,7 +121,7 @@ namespace crossover
 			// std::this_thread::sleep_for(10s);
 
 			// Access the database and collection
-			mongocxx::pool::entry client = mongodb_pool.acquire();
+			mongocxx::pool::entry client = m_mongodb_pool->acquire();
 			mongocxx::database db = (*client)["nsvd"];
 
 			// To convert query to utf8 strings, which is required by BSON 
@@ -140,13 +149,17 @@ namespace crossover
 
 			mongocxx::collection vehicles_coll = db["Stolen_Vehicles"];
 			mongocxx::cursor result_cursor = vehicles_coll.find(query_doc.view(), find_options);
-		
+			
+			std::int64_t query_count = vehicles_coll.count(query_doc.view());
+
 			// Construct result
+			bsoncxx::builder::basic::document result;
 			bsoncxx::builder::basic::array arr;
+			result.append(bsoncxx::builder::basic::kvp("matches", query_count));
 			for (auto doc : result_cursor)
 				arr.append(doc);
-			bsoncxx::builder::basic::document result;
 			result.append(bsoncxx::builder::basic::kvp("data", arr));
+			
 			request.reply(web::http::status_codes::OK, bsoncxx::to_json(result)).wait();
 		}
 		// Todo: handle different types of exceptions
@@ -168,4 +181,5 @@ namespace crossover
 		return m_http_listener->close();
 	}
 
+}
 }

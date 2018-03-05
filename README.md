@@ -45,3 +45,6 @@ Setting up environment
 			MongoCXX : "C:\mongo-cxx-driver"
 			Wt       : "C:\Wt 4.0.2 msvs2017 x86"
 			
+		DLL binaries
+			Place external dlls under external_dlls folder
+

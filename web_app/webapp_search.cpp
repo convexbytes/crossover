@@ -1,14 +1,14 @@
-#include "webapp_nsv_search.h"
+#include "webapp_search.h"
 
 #include <mongocxx\pool.hpp>
 #include "..\lib\string.h"
 
 namespace crossover
 {
-namespace nvsdweb
+namespace nsv
 {
 
-webapp_nsv_search::webapp_nsv_search(const Wt::WEnvironment& env) : Wt::WApplication(env)
+webapp_search::webapp_search(const Wt::WEnvironment& env) : Wt::WApplication(env)
 {
 	// Title
 	// TODO: use resources for texts?
@@ -44,40 +44,40 @@ webapp_nsv_search::webapp_nsv_search(const Wt::WEnvironment& env) : Wt::WApplica
 	m_results->setHeaderCount(1);
 
 	// Assign a handler for the search button
-	search_button->clicked().connect(this, &webapp_nsv_search::on_search_button_click);
+	search_button->clicked().connect(this, &webapp_search::on_search_button_click);
 	
 }
 
-webapp_nsv_search::~webapp_nsv_search()
+webapp_search::~webapp_search()
 {
 }
 
 
-web::uri webapp_nsv_search::create_uri_from_input()
+web::uri webapp_search::create_uri_from_input()
 {
 	web::uri_builder uri_builder;
 
 	if (!m_vehicle_registration_edit->text().empty())
-		uri_builder.append_query(utility::string_t(U("Vehicle_Registration")), m_vehicle_registration_edit->text());
+		uri_builder.append_query(utility::string_t(_XPLATSTR("Vehicle_Registration")), m_vehicle_registration_edit->text());
 
 	if (!m_vehicle_make_edit->text().empty())
-		uri_builder.append_query(utility::string_t(U("Vehicle_Make")), m_vehicle_make_edit->text());
+		uri_builder.append_query(utility::string_t(_XPLATSTR("Vehicle_Make")), m_vehicle_make_edit->text());
 
 	if (!m_vehicle_model_edit->text().empty())
-		uri_builder.append_query(utility::string_t(U("Vehicle_Model")), m_vehicle_model_edit->text());
+		uri_builder.append_query(utility::string_t(_XPLATSTR("Vehicle_Model")), m_vehicle_model_edit->text());
 
 	if (!m_vehicle_owner_edit->text().empty())
-		uri_builder.append_query(utility::string_t(U("Vehicle_Owner")), m_vehicle_owner_edit->text());
+		uri_builder.append_query(utility::string_t(_XPLATSTR("Vehicle_Owner")), m_vehicle_owner_edit->text());
 
 	return uri_builder.to_uri();	
 }
 
-std::optional<std::string> webapp_nsv_search::validate_input()
+std::optional<std::string> webapp_search::validate_input()
 {
 	return {};
 }
 
-void webapp_nsv_search::on_search_error(std::string & e)
+void webapp_search::on_search_error(std::string & e)
 {
 	std::stringstream display_text{};
 	display_text
@@ -86,7 +86,7 @@ void webapp_nsv_search::on_search_error(std::string & e)
 	m_search_result->setText(display_text.str());	
 }
 
-void webapp_nsv_search::on_search_http_error(web::http::http_response & response)
+void webapp_search::on_search_http_error(web::http::http_response & response)
 {
 	std::stringstream failure_text{};
 	failure_text
@@ -96,12 +96,12 @@ void webapp_nsv_search::on_search_http_error(web::http::http_response & response
 }
 
 
-void webapp_nsv_search::on_search_button_click()
+void webapp_search::on_search_button_click()
 {
 	web::uri uri = create_uri_from_input();
 
 	// TODO: remove hardcoded service address
-	utility::string_t nsv_service_address{ U("http://127.0.0.1:34567") };
+	utility::string_t nsv_service_address{ _XPLATSTR("http://127.0.0.1:34567") };
 	
 	// http client to connect to nsv service
 	web::http::client::http_client http_client{ nsv_service_address };
@@ -136,7 +136,7 @@ void webapp_nsv_search::on_search_button_click()
 	}
 }
 
-void webapp_nsv_search::update_result(web::json::value & result)
+void webapp_search::update_result(web::json::value & result)
 {
 	m_results->clear();
 
@@ -146,14 +146,23 @@ void webapp_nsv_search::update_result(web::json::value & result)
 	m_results->elementAt(0, 2)->addWidget(std::make_unique<Wt::WText>("Model"));
 	m_results->elementAt(0, 3)->addWidget(std::make_unique<Wt::WText>("Owner"));
 
-	auto data = result[U("data")];
+	auto data = result[_XPLATSTR("data")];
+	auto arr_data = data.as_array();
+	auto matches = result[_XPLATSTR("matches")].as_integer();
+	
+	std::stringstream text;
+	text << "Found " << result[_XPLATSTR("matches")].as_integer() << " matches."; 
+	if (matches > arr_data.size())
+		text << "Showing " << arr_data.size();
+	m_search_result->setText(text.str());
+	
 	unsigned row = 1; // header is row 0
 	for (auto && vehicle : data.as_array())
 	{
-		auto reg = vehicle[U("Vehicle_Registration")].as_string();
-		auto make = vehicle[U("Vehicle_Make")].as_string();
-		auto model = vehicle[U("Vehicle_Model")].as_string();
-		auto owner = vehicle[U("Vehicle_Owner")].as_string();
+		auto reg = vehicle[_XPLATSTR("Vehicle_Registration")].as_string();
+		auto make = vehicle[_XPLATSTR("Vehicle_Make")].as_string();
+		auto model = vehicle[_XPLATSTR("Vehicle_Model")].as_string();
+		auto owner = vehicle[_XPLATSTR("Vehicle_Owner")].as_string();
 		
 		m_results->elementAt(row, 0)->addWidget(std::make_unique<Wt::WText>(string::utf16_to_utf8(reg)));
 		m_results->elementAt(row, 1)->addWidget(std::make_unique<Wt::WText>(string::utf16_to_utf8(make)));
@@ -163,7 +172,7 @@ void webapp_nsv_search::update_result(web::json::value & result)
 	}
 }
 
-void webapp_nsv_search::layout()
+void webapp_search::layout()
 {
 
 }
@@ -177,6 +186,6 @@ void webapp_nsv_search::layout()
 int main(int argc, char **argv)
 {
 	return Wt::WRun(argc, argv, [](const Wt::WEnvironment& env) {
-		return std::make_unique<crossover::nvsdweb::webapp_nsv_search>(env);
+		return std::make_unique<crossover::nsv::webapp_search>(env);
 	});
 }

@@ -82,6 +82,9 @@
       <AdditionalLibraryDirectories>C:\Wt 4.0.2 msvs2017 x86\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>wtd.lib;wthttpd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(SolutionDir)external_dlls\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -117,10 +120,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="webapp_nsv_search.cpp" />
+    <ClCompile Include="webapp_search.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="webapp_nsv_search.h" />
+    <ClInclude Include="webapp_search.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -1,13 +1,13 @@
+#define _TURN_OFF_PLATFORM_STRING 1
+
 #include "../nsv_service/nsv_service.h"
+#include "../lib/string.h"
 
-#include <boost\asio.hpp>
-#include <boost\program_options.hpp>
-
-#include "..\lib\string.h"
+#include <boost/asio.hpp>
+#include <boost/program_options.hpp>
 
 boost::asio::io_context io;
-std::unique_ptr<crossover::nsv_service> nsv_service;
-std::string service_address;
+std::unique_ptr<crossover::nsv::nsv_service> nsv_service;
 
 namespace bpo = boost::program_options;
 
@@ -27,14 +27,14 @@ int main(int argc, char **argv)
 		bpo::options_description opt_desc{"Options"};
 		opt_desc.add_options()
 			("address,a", bpo::value<std::string>()->default_value("http://127.0.0.1:34567"), "Service address");
+		opt_desc.add_options()
+			("mongodb_uri,d", bpo::value<std::string>()->default_value("mongodb://localhost:27017/?minPoolSize=1&maxPoolSize=100"), "MongoDB URI");
 		bpo::variables_map opt_var_map;
 		bpo::store (bpo::parse_command_line(argc, argv, opt_desc), opt_var_map);
 		bpo::notify(opt_var_map);
-		if (opt_var_map.count("address"))
-			service_address = opt_var_map["address"].as<std::string>();
-		else
-			service_address = "http://127.0.0.1:34567";
-
+		
+		auto service_address = opt_var_map["address"].as<std::string>();
+		auto mongo_uri = opt_var_map["mongodb_uri"].as<std::string>();
 
 
 		// Setup Ctrl-C signal
@@ -43,7 +43,10 @@ int main(int argc, char **argv)
 
 		// Start service
 		std::cout << "Starting service" << std::endl;
-		nsv_service = std::make_unique<crossover::nsv_service>(crossover::string::to_utility_string(service_address));
+		std::cout << "Address:" << service_address  << std::endl;
+		std::cout << "MongoDB URI:" << mongo_uri << std::endl;
+		nsv_service = std::make_unique<crossover::nsv::nsv_service>(service_address,mongo_uri);
+
 		auto task = nsv_service->start();
 		task.wait();
 		std::cout << "Service listening. Hit Ctrl-C to stop." << std::endl;

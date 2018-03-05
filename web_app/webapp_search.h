@@ -7,7 +7,8 @@
 #include <Wt/WPushButton.h>
 #include <Wt/WText.h>
 #include <Wt/WTable.h>
-#include <Wt\WBootstrapTheme.h>
+#include <Wt/WBootstrapTheme.h>
+
 
 /// bson and mongo must be included BEFORE cpprestsdk
 /// cpprestsdk defines U, which causes an issue with boost type_traits.hpp,
@@ -19,30 +20,23 @@
 #include <mongocxx/uri.hpp>
 #include <mongocxx/instance.hpp>
 
-#include <cpprest\http_client.h>
-#include <cpprest\filestream.h>
-#include <cpprest\http_listener.h>
+#include <cpprest/http_client.h>
+#include <cpprest/filestream.h>
+#include <cpprest/http_listener.h>
 
 #include <optional>
 
 
-/// Default mongo db client pool size if not defined anywhere else
-/// It is a small application, 50 sounds reasonable
-#ifndef NVSDWEB_DBCLIENT_POOL_SIZE
-#define NVSDWEB_DBCLIENT_POOL_SIZE 50
-#endif
-
-
 namespace crossover
 {
-namespace nvsdweb
+namespace nsv
 {	
 
-	class webapp_nsv_search : public Wt::WApplication
+	class webapp_search : public Wt::WApplication
 	{
 	public:
-		webapp_nsv_search(const Wt::WEnvironment& env);
-		~webapp_nsv_search();
+		webapp_search(const Wt::WEnvironment& env);
+		~webapp_search();
 
 	private:
 		Wt::WContainerWidget * m_form_container;
@@ -90,14 +84,6 @@ namespace nvsdweb
 		void update_result(web::json::value & result);
 
 
-	};
-
-	/// Encapsulate query building
-	/// TODO:
-	class uri_query_builder 
-	{
-	public:
-	private:
 	};
 }
 }
